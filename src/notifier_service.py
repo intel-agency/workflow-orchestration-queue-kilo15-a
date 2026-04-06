@@ -18,7 +18,10 @@ import hmac
 import logging
 import sys
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
