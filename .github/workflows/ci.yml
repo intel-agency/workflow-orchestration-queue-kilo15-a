@@ -68,7 +68,7 @@ jobs:
         run: uv sync --dev
 
       - name: Run MyPy
-        run: uv run mypy src/
+        run: uv run python -m mypy src/
 
   # ---------------------------------------------------------------------------
   # Test: Run test suite with coverage
@@ -180,7 +180,7 @@ jobs:
         continue-on-error: true
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@cb5b1df6d2604e0a1a4a77d9e9d2cb8e3c7e1a7f  # v0.31.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.31.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
