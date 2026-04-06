@@ -1,6 +1,5 @@
 """Tests for WorkItem model and scrub_secrets utility."""
 
-
 from src.models.work_item import (
     TaskType,
     WorkItem,
