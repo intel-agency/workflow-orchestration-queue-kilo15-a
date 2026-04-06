@@ -1,0 +1,105 @@
+# Docker Compose for workflow-orchestration-queue
+# Local development and testing environment
+
+version: "3.9"
+
+services:
+  # ---------------------------------------------------------------------------
+  # Notifier Service (The Ear)
+  # FastAPI webhook receiver
+  # ---------------------------------------------------------------------------
+  notifier:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: workflow-queue-notifier
+    restart: unless-stopped
+    ports:
+      - "${NOTIFIER_PORT:-8000}:8000"
+    environment:
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO=${GITHUB_REPO}
+      - DEBUG=${DEBUG:-false}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - workflow-queue-network
+    profiles:
+      - full
+      - notifier
+
+  # ---------------------------------------------------------------------------
+  # Sentinel Service (The Brain)
+  # Background polling and dispatch service
+  # ---------------------------------------------------------------------------
+  sentinel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: workflow-queue-sentinel
+    restart: unless-stopped
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO=${GITHUB_REPO}
+      - SENTINEL_BOT_LOGIN=${SENTINEL_BOT_LOGIN}
+      - POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-60}
+      - HEARTBEAT_INTERVAL_SECONDS=${HEARTBEAT_INTERVAL_SECONDS:-300}
+    command: ["python", "-m", "src.orchestrator_sentinel"]
+    volumes:
+      # Mount scripts for shell-bridge execution
+      - ./scripts:/app/scripts:ro
+      # Mount docker socket for worker container management
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - workflow-queue-network
+    depends_on:
+      notifier:
+        condition: service_healthy
+    profiles:
+      - full
+      - sentinel
+
+  # ---------------------------------------------------------------------------
+  # Development container with hot reload
+  # ---------------------------------------------------------------------------
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: workflow-queue-dev
+    ports:
+      - "${NOTIFIER_PORT:-8000}:8000"
+    environment:
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-dev-secret}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO=${GITHUB_REPO}
+      - DEBUG=true
+    command:
+      - uvicorn
+      - src.notifier_service:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --reload
+    volumes:
+      - ./src:/app/src:ro
+      - ./tests:/app/tests:ro
+    networks:
+      - workflow-queue-network
+    profiles:
+      - dev
+
+networks:
+  workflow-queue-network:
+    driver: bridge
+    name: workflow-queue-network
