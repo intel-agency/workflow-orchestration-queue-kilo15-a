@@ -25,6 +25,12 @@ WORKDIR /app
 # Copy dependency files first for better caching
 COPY pyproject.toml uv.lock* ./
 
+# Copy README for package metadata
+COPY README.md LICENSE* ./
+
+# Copy source code BEFORE editable install
+COPY src/ ./src/
+
 # Install dependencies (including dev dependencies for now)
 RUN uv pip install --no-cache -e ".[dev]"
 
@@ -52,14 +58,10 @@ COPY --from=builder --chown=appuser:appgroup /opt/venv /opt/venv
 # Set working directory
 WORKDIR /app
 
-# Copy source code BEFORE editable install
-# This is critical for uv pip install -e . to work
+# Copy source code and config
 COPY --chown=appuser:appgroup src/ ./src/
 COPY --chown=appuser:appgroup pyproject.toml uv.lock* ./
 COPY --chown=appuser:appgroup README.md LICENSE* ./
-
-# Install the package in editable mode
-RUN uv pip install --no-cache -e "."
 
 # Copy scripts for shell-bridge execution
 COPY --chown=appuser:appgroup scripts/ ./scripts/
