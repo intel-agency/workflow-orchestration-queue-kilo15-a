@@ -1,461 +1,392 @@
 # Workflow Execution Plan: project-setup
 
-**Workflow Name:** `project-setup`  
-**Repository:** `intel-agency/workflow-orchestration-queue-kilo15-a`  
-**Working Directory:** `/workspaces/workflow-orchestration-queue-kilo15-a`  
-**Created:** 2026-04-06  
-**Status:** ✅ **APPROVED**
+**Workflow:** `project-setup`
+**Dynamic Workflow File:** `ai_instruction_modules/ai-workflow-assignments/dynamic-workflows/project-setup.md`
+**Repository:** `intel-agency/workflow-orchestration-queue-kilo15-a`
+**Branch:** `dynamic-workflow-project-setup`
+**Date:** 2026-04-13
 
 ---
 
 ## 1. Overview
 
-This document defines the execution plan for the `project-setup` dynamic workflow, which initializes the **OS-APOW (Orchestration System for Autonomous Project Orchestration Workflow)** repository for autonomous agentic orchestration.
+This document is the execution plan for the **project-setup** dynamic workflow, which will initialize the `workflow-orchestration-queue` (OS-APOW) repository and scaffold the complete project foundation.
 
-The workflow transforms this template repository into a fully-configured project environment ready for implementing the headless agentic orchestration platform described in the plan documents.
+| Property | Value |
+|---|---|
+| **Workflow Name** | project-setup |
+| **Project Name** | workflow-orchestration-queue (OS-APOW) |
+| **Brief Description** | Headless agentic orchestration platform that transforms GitHub Issues into autonomous AI worker execution orders via DevContainers and shell-bridge infrastructure |
+| **Total Main Assignments** | 6 |
+| **Pre-script Events** | 1 (`create-workflow-plan`) |
+| **Post-assignment Events** | 2 per main assignment (`validate-assignment-completion`, `report-progress`) |
+| **Post-script Events** | 1 (`orchestration:plan-approved` label application) |
 
-### Workflow Purpose
+**High-Level Summary:**
 
-Transform the `workflow-orchestration-queue-kilo15-a` template repository into a production-ready project by:
-
-1. Initializing repository settings (GitHub Project, labels, milestones)
-2. Creating a comprehensive application plan based on the provided specification documents
-3. Establishing the Python project structure with proper scaffolding
-4. Documenting agent instructions via AGENTS.md
-5. Capturing learnings and execution trace for continuous improvement
+The workflow begins by creating this execution plan (current step), then initializes the repository with GitHub Projects, labels, milestones, and branch protection. It proceeds through application planning, project structure scaffolding, AGENTS.md creation, debrief documentation, and finally merges the setup PR. After each main assignment, an independent validation and progress report is executed. Upon full completion, the `orchestration:plan-approved` label is applied to the plan issue to trigger the next orchestration phase.
 
 ---
 
 ## 2. Project Context Summary
 
-### Project Identity
+### 2.1 Key Facts
 
-| Attribute | Value |
-|-----------|-------|
-| **Project Name** | OS-APOW (workflow-orchestration-queue) |
-| **Purpose** | Headless agentic orchestration platform |
-| **Paradigm** | Transforms GitHub Issues into automated execution orders for AI agents |
-| **Self-Bootstrapping** | System builds its own Phase 2 and 3 using Phase 1 orchestrator |
+| Fact | Detail |
+|---|---|
+| **Project Name** | workflow-orchestration-queue (OS-APOW — Opencode-Server Agent Workflow Orchestration) |
+| **Repository** | `intel-agency/workflow-orchestration-queue-kilo15-a` |
+| **Description** | A headless agentic orchestration platform that replaces interactive AI coding with autonomous background processing. GitHub Issues labeled `agent:queued` trigger AI workers that clone repos, generate code, run tests, and submit PRs without human intervention. |
+| **Tech Stack** | Python 3.12+, FastAPI, Pydantic, httpx, uv (package manager), Docker/DevContainers, PowerShell Core (pwsh), Bash |
+| **Frameworks** | FastAPI (webhook receiver), Uvicorn (ASGI server), Pydantic (data validation), httpx (async HTTP client) |
+| **Package Manager** | uv (Rust-based Python package manager, tracked via `pyproject.toml` + `uv.lock`) |
+| **No .NET** | This is a Python/Shell ecosystem. No `global.json` or .NET tooling required. |
 
-### Technology Stack
+### 2.2 Architecture — Four Pillars
 
-| Category | Technology |
-|----------|------------|
-| **Language** | Python 3.12+ |
-| **Web Framework** | FastAPI + Uvicorn |
-| **Validation** | Pydantic |
-| **HTTP Client** | httpx (async) |
-| **Package Manager** | uv |
-| **Containerization** | Docker / DevContainers |
-| **Shell Scripts** | PowerShell Core (pwsh) / Bash |
+1. **The Ear (Work Event Notifier):** FastAPI-based webhook receiver (`notifier_service.py`) that ingests GitHub events, validates HMAC signatures, triages issues, and queues tasks.
+2. **The State (Work Queue):** GitHub Issues as the persistence layer ("Markdown as a Database") with label-based state machine (`agent:queued` → `agent:in-progress` → `agent:success`/`agent:error`).
+3. **The Brain (Sentinel Orchestrator):** Persistent async Python background service (`orchestrator_sentinel.py`) that polls for queued tasks, claims them via assign-then-verify locking, manages worker lifecycle via shell bridge, and posts heartbeats.
+4. **The Hands (Opencode Worker):** Isolated DevContainer environment executing LLM-driven agent instructions via `devcontainer-opencode.sh` shell bridge.
 
-### Architecture: Four Pillars
+### 2.3 Phased Delivery Plan
 
-1. **The Ear (Work Event Notifier)** - FastAPI webhook receiver for GitHub events
-2. **The State (Work Queue)** - GitHub Issues as distributed state ("Markdown as a Database")
-3. **The Brain (Sentinel Orchestrator)** - Async polling background service
-4. **The Hands (Opencode Worker)** - DevContainer-based execution environment
+| Phase | Name | Scope |
+|---|---|---|
+| Phase 0 | Seeding & Bootstrapping | Manual repo clone, environment setup, plan doc seeding |
+| Phase 1 | The Sentinel (MVP) | Polling engine, shell-bridge dispatch, status feedback, heartbeat, locking |
+| Phase 2 | The Ear (Webhook Automation) | FastAPI webhook receiver, HMAC validation, intelligent triage |
+| Phase 3 | Deep Orchestration | Architect sub-agent, hierarchical decomposition, self-healing, cost guardrails |
 
-### Key Architectural Decisions (ADRs)
+### 2.4 Reference Implementations
 
-| ADR | Decision | Rationale |
-|-----|----------|-----------|
-| **ADR 07** | Shell-Bridge Execution via `devcontainer-opencode.sh` | Environment parity with human developers |
-| **ADR 08** | Polling-First Resiliency | Self-healing on restart; webhooks are optimization |
-| **ADR 09** | Provider-Agnostic Interface (ITaskQueue) | Future swap to Linear, Jira, etc. |
+Reference code exists in `plan_docs/`:
+- `orchestrator_sentinel.py` — Full Sentinel implementation with signal handling, heartbeat coroutine, jittered backoff, and subprocess timeouts
+- `notifier_service.py` — FastAPI webhook handler with HMAC validation, environment validation, and queue integration
+- `src/models/work_item.py` — Unified `WorkItem`, `TaskType`, `WorkItemStatus` models + `scrub_secrets()` credential scrubber
+- `src/queue/github_queue.py` — `ITaskQueue` ABC + `GitHubQueue` concrete implementation with connection pooling, assign-then-verify locking, and heartbeat posting
+- `interactive-report.html` — Interactive React-based architecture presentation dashboard
 
-### Development Phases
+### 2.5 Key Constraints & Design Decisions
 
-| Phase | Name | Description | Status |
-|-------|------|-------------|--------|
-| **0** | Seeding & Bootstrapping | Manual clone, env setup, plan seeding | 📋 Planned |
-| **1** | Sentinel (MVP) | Polling, shell-bridge, status feedback | 📋 Planned |
-| **2** | The Ear (Webhook) | FastAPI webhook receiver, triage | 📋 Planned |
-| **3** | Deep Orchestration | Hierarchical decomposition, self-healing | 📋 Planned |
+- **Shell-First Integration:** Sentinel interacts with workers exclusively via `devcontainer-opencode.sh` — no Docker SDK
+- **Polling-First Resiliency:** Webhooks are an optimization; polling is the primary discovery mechanism
+- **Provider-Agnostic Interface:** `ITaskQueue` ABC retained for future provider swapping (Linear, Jira)
+- **Assign-Then-Verify Locking:** Distributed lock via GitHub Assignees to prevent concurrent Sentinel collisions
+- **Credential Scrubbing:** All public-facing output sanitized via `scrub_secrets()` regex
+- **Action SHA Pinning:** All GitHub Actions workflows MUST pin actions to specific commit SHAs
 
-### Source Documents in `plan_docs/`
+### 2.6 Known Issues from Plan Review
 
-| Document | Purpose |
-|----------|---------|
-| `OS-APOW Development Plan v4.2.md` | Phased roadmap, user stories, risk assessment |
-| `OS-APOW Architecture Guide v3.2.md` | System diagrams, ADRs, data flow, security |
-| `OS-APOW Implementation Specification v1.2.md` | Requirements, features, test cases |
-| `OS-APOW Simplification Report v1.md` | Applied simplifications (S-1 through S-11) |
-| `OS-APOW Plan Review.md` | Strengths analysis, issues, recommendations |
-| `orchestrator_sentinel.py` | Reference implementation (292 lines) |
-| `notifier_service.py` | Reference implementation (110 lines) |
-| `src/models/work_item.py` | Unified data model |
-| `src/queue/github_queue.py` | GitHub-backed queue implementation |
+The Plan Review document (`OS-APOW Plan Review.md`) identified these issues in the reference implementations:
+- **I-1:** Divergent WorkItem models between components — **RESOLVED** (unified in `src/models/work_item.py`)
+- **I-2:** Race condition in task claiming — **RESOLVED** (assign-then-verify implemented in `github_queue.py`)
+- **I-3:** No jittered exponential backoff — **RESOLVED** (implemented in `orchestrator_sentinel.py`)
+- **I-4:** Per-call `httpx.AsyncClient` — **RESOLVED** (connection pooling in `GitHubQueue.__init__()`)
+- **I-5:** Hardcoded secrets in notifier — **RESOLVED** (env var validation at import time)
+- **I-6:** No heartbeat implementation — **RESOLVED** (async heartbeat coroutine in Sentinel)
+- **I-7:** Cost guardrails not implemented — **DEFERRED** (model defined, logic deferred)
+- **I-9:** Bare `except: pass` — **RESOLVED** (specific exception handling)
+- **I-10:** No environment reset between tasks — **RESOLVED** (`stop` command after each task)
 
-### Applied Simplifications (from Simplification Report)
+### 2.7 Simplification Decisions (Applied)
 
-| ID | Simplification | Status |
-|----|----------------|--------|
-| S-3 | Reduced to 3 env vars (GITHUB_TOKEN, GITHUB_ORG, SENTINEL_BOT_LOGIN) | ✅ Implemented |
-| S-4 | Hardcoded ENV_RESET_MODE to "stop" | ✅ Implemented |
-| S-5 | Single-repo polling only (Search API deferred) | ✅ Implemented |
-| S-6 | Consolidated queue to `src/queue/github_queue.py` | ✅ Implemented |
-| S-7 | Removed IPv4 scrubbing pattern | ✅ Implemented |
-| S-8 | Removed "encrypted" log verbiage | ✅ Implemented |
-| S-9 | Phase 3 features moved to Future Work appendix | ✅ Implemented |
-| S-10 | Removed FileHandler (stdout only) | ✅ Implemented |
-| S-11 | Removed raw_payload field from WorkItem | ✅ Implemented |
+Per the Simplification Report (`OS-APOW Simplification Report v1.md`):
+- S-3: Reduced to 3 env vars only (GITHUB_TOKEN, GITHUB_ORG, GITHUB_REPO)
+- S-4: Environment reset hardcoded to `"stop"` mode only
+- S-5: Single-repo polling only (cross-repo noted for future)
+- S-6: Queue consolidated to `src/queue/github_queue.py`
+- S-7: IPv4 scrubbing pattern removed
+- S-8: "Encrypted" log verbiage removed
+- S-9: Phase 3 features moved to appendix
+- S-10: Single logging to stdout only
+- S-11: `raw_payload` field removed from WorkItem
 
 ---
 
 ## 3. Assignment Execution Plan
 
-### Execution Sequence
+### 3.0 Pre-script Event: `create-workflow-plan` (CURRENT)
 
-| # | Assignment | Goal | Key Acceptance Criteria | Dependencies | Complexity |
-|---|------------|------|------------------------|--------------|------------|
-| **Pre** | `create-workflow-plan` | Create this execution plan | Plan committed to `plan_docs/workflow-plan.md` | None | Low |
-| **1** | `init-existing-repository` | Initialize repo settings | Branch created, GitHub Project linked, labels imported, PR created | Pre complete | Medium |
-| **2** | `create-app-plan` | Create comprehensive app plan | Plan issue created, milestones linked, `implementation:ready` label applied | #1 complete | High |
-| **3** | `create-project-structure` | Create project scaffolding | pyproject.toml, src/, tests/, Dockerfile, CI/CD foundation | #2 approved | High |
-| **4** | `create-agents-md-file` | Create AGENTS.md for AI agents | AGENTS.md at root with validated commands | #3 complete | Medium |
-| **5** | `debrief-and-document` | Capture learnings | Debrief report with 12 sections, execution trace saved | #1-4 complete | Medium |
-| **Post** | `validate-assignment-completion` | Verify all criteria met | All acceptance criteria verified | #1-5 complete | Low |
-| **Post** | `report-progress` | Report workflow completion | Progress reported to orchestrator | Validation pass | Low |
-
-### Assignment Details
-
-#### Pre-Script-Begin: `create-workflow-plan` (This Assignment)
-
-**Goal:** Create a comprehensive workflow execution plan before beginning the main script.
-
-**Acceptance Criteria:**
-- [x] Dynamic workflow file read and understood
-- [x] All workflow assignments traced and read
-- [x] All documents in `plan_docs/` read
-- [x] Workflow execution plan produced with required sections
-- [ ] Plan committed to `plan_docs/workflow-plan.md`
+| Field | Content |
+|---|---|
+| **Assignment** | `create-workflow-plan`: Create Workflow Plan |
+| **Goal** | Create a comprehensive workflow execution plan by reading the dynamic workflow, tracing all assignments, and synthesizing project context from plan_docs/ |
+| **Key Acceptance Criteria** | Dynamic workflow fully read; all assignments traced; all plan_docs/ read and summarized; structured plan produced; plan committed as `plan_docs/workflow-plan.md` |
+| **Project-Specific Notes** | The project has extensive plan documentation (7 docs + reference code). The reference implementations are production-quality scaffolds that will guide the project structure assignment. |
+| **Prerequisites** | Repository cloned; plan_docs/ seeded; remote assignment files accessible |
+| **Dependencies** | None (first step) |
+| **Risks / Challenges** | Large volume of plan docs to synthesize; ensuring all assignments are correctly traced from remote canonical source |
+| **Events** | None (pre-script event itself) |
 
 ---
 
-#### Assignment 1: `init-existing-repository`
+### 3.1 Main Assignment 1: `init-existing-repository`
 
-**Goal:** Initialize repository with GitHub Project, labels, milestones, and working branch.
-
-**Key Steps:**
-1. Create branch `dynamic-workflow-project-setup`
-2. Create GitHub Project with Board template
-3. Import labels from `.github/.labels.json`
-4. Rename workspace and devcontainer files to match repo name
-5. Create PR from branch to `main`
-
-**Acceptance Criteria:**
-- [ ] New branch created (must be first)
-- [ ] GitHub Project created and linked
-- [ ] Project columns: Not Started, In Progress, In Review, Done
-- [ ] Labels imported from `.github/.labels.json`
-- [ ] Filenames changed to match project name
-- [ ] PR created from branch to `main`
-
-**Verification:** Run `./scripts/test-github-permissions.ps1 -Owner intel-agency`
+| Field | Content |
+|---|---|
+| **Assignment** | `init-existing-repository`: Initiate Existing Repository |
+| **Goal** | Set up the repository with branch protection, GitHub Project for issue tracking, labels, renamed workspace/devcontainer files, and an open PR |
+| **Key Acceptance Criteria** | (1) New branch `dynamic-workflow-project-setup` created; (2) Branch protection ruleset imported from `.github/protected-branches_ruleset.json`; (3) GitHub Project created with Not Started / In Progress / In Review / Done columns; (4) Labels imported from `.github/.labels.json`; (5) Workspace and devcontainer files renamed; (6) PR opened from branch to main |
+| **Project-Specific Notes** | Repository name is `workflow-orchestration-queue-kilo15-a`. Devcontainer should be renamed to `workflow-orchestration-queue-kilo15-a-devcontainer`. Workspace file should be renamed to `workflow-orchestration-queue-kilo15-a.code-workspace`. Branch protection ruleset requires `GH_ORCHESTRATION_AGENT_TOKEN` (PAT with `administration: write` scope). |
+| **Prerequisites** | GitHub auth with `repo`, `project`, `read:project`, `read:user`, `user:email` scopes; `administration: write` on repo |
+| **Dependencies** | None (first main assignment) |
+| **Risks / Challenges** | (1) PAT may lack `administration: write` scope for branch protection import — must fail loudly if so; (2) GitHub Project creation may fail if org-level permissions are insufficient; (3) PR creation requires at least one commit pushed first |
+| **Events** | Post-assignment: `validate-assignment-completion` → `report-progress` |
 
 ---
 
-#### Assignment 2: `create-app-plan`
+### 3.2 Main Assignment 2: `create-app-plan`
 
-**Goal:** Create a comprehensive application plan based on the specification documents.
-
-**Key Inputs:**
-- `plan_docs/OS-APOW Development Plan v4.2.md`
-- `plan_docs/OS-APOW Architecture Guide v3.2.md`
-- `plan_docs/OS-APOW Implementation Specification v1.2.md`
-
-**Key Steps:**
-1. Analyze all plan documents
-2. Document tech stack in `plan_docs/tech-stack.md`
-3. Document architecture in `plan_docs/architecture.md`
-4. Create planning issue using application-plan.md template
-5. Create milestones based on phases
-6. Link issue to GitHub Project
-7. Apply labels: `planning`, `documentation`, `implementation:ready`
-
-**Acceptance Criteria:**
-- [ ] Application template analyzed
-- [ ] Project structure documented
-- [ ] Plan issue created from template
-- [ ] All phases with steps listed
-- [ ] Risks and mitigations identified
-- [ ] Milestones created and linked
-- [ ] `implementation:ready` label applied
-
-**Important:** This is PLANNING ONLY - no implementation code.
+| Field | Content |
+|---|---|
+| **Assignment** | `create-app-plan`: Create Application Plan |
+| **Goal** | Create a comprehensive application plan documented as a GitHub Issue using the Appendix A template, based on the plan documents in `plan_docs/` |
+| **Key Acceptance Criteria** | (1) Application template analyzed; (2) Plan documented in GitHub Issue using template; (3) `plan_docs/tech-stack.md` created; (4) `plan_docs/architecture.md` created; (5) Milestones created for each phase; (6) Issue linked to GitHub Project and assigned to "Phase 1: Foundation" milestone; (7) Labels applied (planning, documentation); (8) **No implementation code written** |
+| **Project-Specific Notes** | The project already has extensive plan docs that serve as the "application template": Development Plan v4.2, Architecture Guide v3.2, Implementation Specification v1.2, plus reference implementations. The agent should synthesize these into a single actionable plan issue. Key tech: Python 3.12+, FastAPI, Pydantic, httpx, uv. No .NET. The plan issue template is at `.github/ISSUE_TEMPLATE/application-plan.md`. |
+| **Prerequisites** | Repository initialized (labels, project, milestones available); `plan_docs/` directory with all planning documents |
+| **Dependencies** | `init-existing-repository` must be complete (labels and project needed for issue linking) |
+| **Risks / Challenges** | (1) Volume of existing plan docs may overwhelm the planning process — agent must synthesize, not copy-paste; (2) The existing plan has 4 phases — milestone creation must align; (3) References to example plans (nam20485/advanced-memory3#12, nam20485/support-assistant#2) should guide formatting; (4) Must resist the urge to write code — this is planning only |
+| **Events** | Pre: `gather-context`; Post-assignment: `validate-assignment-completion` → `report-progress`; On-failure: `recover-from-error` |
 
 ---
 
-#### Assignment 3: `create-project-structure`
+### 3.3 Main Assignment 3: `create-project-structure`
 
-**Goal:** Create the actual Python project structure and scaffolding.
-
-**Tech Stack Adaptation:** Python (uv) - adapt from generic instructions:
-- Use `pyproject.toml` instead of `.csproj`
-- Use `uv` for dependency management
-- Use `src/` layout pattern
-
-**Key Steps:**
-1. Create `pyproject.toml` with dependencies
-2. Set up `src/os_apow/` package structure
-3. Create `tests/` directory with test structure
-4. Create `Dockerfile` and `docker-compose.yml`
-5. Create `.python-version` for version pinning
-6. Set up CI/CD workflow templates
-7. Create documentation structure (README.md, docs/)
-8. Create `.ai-repository-summary.md`
-
-**Project Structure (Python):**
-```
-/
-├── pyproject.toml
-├── uv.lock
-├── src/
-│   └── os_apow/
-│       ├── __init__.py
-│       ├── sentinel/
-│       ├── notifier/
-│       ├── models/
-│       └── queue/
-├── tests/
-│   ├── __init__.py
-│   └── test_sentinel.py
-├── Dockerfile
-├── docker-compose.yml
-├── README.md
-├── AGENTS.md
-└── docs/
-```
-
-**Acceptance Criteria:**
-- [ ] Solution/project structure created
-- [ ] All required directories established
-- [ ] Initial configuration files created
-- [ ] Basic CI/CD pipeline structure
-- [ ] Documentation structure created
-- [ ] Development environment validated
-- [ ] Initial commit with scaffolding
-- [ ] Repository summary created
+| Field | Content |
+|---|---|
+| **Assignment** | `create-project-structure`: Create Project Structure |
+| **Goal** | Create the actual project structure, scaffolding, Docker configs, CI/CD pipelines, documentation, and repository summary based on the application plan |
+| **Key Acceptance Criteria** | (1) Solution/project structure created following Python/uv conventions; (2) `pyproject.toml` with version pinning; (3) Dockerfile + docker-compose.yml created; (4) CI/CD workflow with SHA-pinned actions; (5) README.md + docs/ structure; (6) Test project structure; (7) Repository summary at `.ai-repository-summary.md`; (8) Build verifies successfully |
+| **Project-Specific Notes** | Tech stack is Python 3.12+ with uv. Structure should follow the Implementation Spec layout: `src/notifier_service.py`, `src/orchestrator_sentinel.py`, `src/models/work_item.py`, `src/queue/github_queue.py`, `scripts/`, `local_ai_instruction_modules/`, `docs/`. Reference implementations in `plan_docs/` provide the exact code to scaffold. Dockerfile must support Python 3.12+ with uv. Healthcheck must use Python stdlib (no curl). Docker Compose for local dev with Sentinel + Notifier services. |
+| **Prerequisites** | Application plan documented in issue (from `create-app-plan`); tech-stack and architecture docs available |
+| **Dependencies** | `create-app-plan` must be complete |
+| **Risks / Challenges** | (1) Must pin all GitHub Actions to specific commit SHAs; (2) Docker healthcheck cannot use curl — must use Python stdlib; (3) `COPY src/ ./src/` must appear before `uv pip install -e .` in Dockerfile; (4) Reference code in plan_docs/ must be correctly adapted, not blindly copied |
+| **Events** | Post-assignment: `validate-assignment-completion` → `report-progress` |
 
 ---
 
-#### Assignment 4: `create-agents-md-file`
+### 3.4 Main Assignment 4: `create-agents-md-file`
 
-**Goal:** Create `AGENTS.md` at repository root for AI coding agent context.
-
-**Key Sections:**
-1. Project Overview
-2. Setup Commands (install, build, run, test, lint)
-3. Project Structure
-4. Code Style conventions
-5. Testing Instructions
-6. Architecture Notes
-7. PR and Commit Guidelines
-8. Common Pitfalls
-
-**Acceptance Criteria:**
-- [ ] AGENTS.md exists at repository root
-- [ ] All commands validated by running them
-- [ ] Project structure documented
-- [ ] Code style conventions listed
-- [ ] File committed to working branch
+| Field | Content |
+|---|---|
+| **Assignment** | `create-agents-md-file`: Create AGENTS.md File |
+| **Goal** | Create a comprehensive `AGENTS.md` at the repository root following the open agents.md specification, providing AI coding agents with project context, build commands, and conventions |
+| **Key Acceptance Criteria** | (1) `AGENTS.md` exists at repo root; (2) Contains project overview, setup commands, project structure, code style, testing instructions, architecture notes, PR guidelines; (3) All commands validated by running them; (4) Complements (not duplicates) README.md and `.ai-repository-summary.md` |
+| **Project-Specific Notes** | Commands will be Python/uv-based: `uv sync`, `uv run python -m src.notifier_service`, `uv run pytest`, `uv run ruff check`. The file must document the Sentinel and Notifier components, the shell-bridge architecture, and the label-based state machine. |
+| **Prerequisites** | Repository initialized; project structure created; build/test tooling in place |
+| **Dependencies** | `create-project-structure` must be complete |
+| **Risks / Challenges** | (1) Commands listed in AGENTS.md must be validated by actually running them — if the project doesn't build yet, this will fail; (2) Must cross-reference with README.md and `.ai-repository-summary.md` to avoid duplication |
+| **Events** | Post-assignment: `validate-assignment-completion` → `report-progress` |
 
 ---
 
-#### Assignment 5: `debrief-and-document`
+### 3.5 Main Assignment 5: `debrief-and-document`
 
-**Goal:** Capture learnings, insights, and execution trace.
+| Field | Content |
+|---|---|
+| **Assignment** | `debrief-and-document`: Debrief and Document Learnings |
+| **Goal** | Capture key learnings, insights, deviations, and improvement areas from the completed assignments in a structured debrief report |
+| **Key Acceptance Criteria** | (1) Structured report following the 12-section template; (2) All deviations from assignments documented; (3) Execution trace saved at `debrief-and-document/trace.md`; (4) Report committed and pushed; (5) Stakeholder approval obtained |
+| **Project-Specific Notes** | This is the first project execution using the workflow-orchestration-queue template, so the debrief is especially valuable for improving the template and assignment definitions. Any issues with branch protection, label import, or project creation should be prominently documented. |
+| **Prerequisites** | All main assignments through `create-agents-md-file` complete |
+| **Dependencies** | `create-agents-md-file` must be complete |
+| **Risks / Challenges** | (1) Agent must accurately recall all deviations — maintaining a trace during execution is critical; (2) The "Plan Adjustment Mandate" requires flagging plan-impacting findings as ACTION ITEMS |
+| **Events** | Post-assignment: `validate-assignment-completion` → `report-progress` |
 
-**Key Deliverables:**
-1. Debrief report with 12 required sections
-2. Execution trace document (`debrief-and-document/trace.md`)
-3. All deviations from assignment documented
+---
 
-**Report Sections:**
-1. Executive Summary
-2. Workflow Overview
-3. Key Deliverables
-4. Lessons Learned
-5. What Worked Well
-6. What Could Be Improved
-7. Errors Encountered and Resolutions
-8. Complex Steps and Challenges
-9. Suggested Changes
-10. Metrics and Statistics
-11. Future Recommendations
-12. Conclusion
+### 3.6 Main Assignment 6: `pr-approval-and-merge`
 
-**Acceptance Criteria:**
-- [ ] Report created with all 12 sections
-- [ ] Report in .md format
-- [ ] All deviations documented
-- [ ] Report reviewed and approved
-- [ ] Report committed to repo
-- [ ] Execution trace saved
+| Field | Content |
+|---|---|
+| **Assignment** | `pr-approval-and-merge`: Pull Request Approval and Merge |
+| **Goal** | Complete the full PR approval and merge process: resolve all review comments, obtain approval, merge the setup PR, delete the setup branch, and close related issues |
+| **Key Acceptance Criteria** | (1) All CI checks pass (with remediation loop up to 3 attempts); (2) Code review delegated to `code-reviewer` subagent (not self-review); (3) All review comments resolved via `ai-pr-comment-protocol.md`; (4) PR merged; (5) Source branch deleted; (6) Related issues closed |
+| **Project-Specific Notes** | This is a setup PR — **self-approval by the orchestrator is acceptable** (per the dynamic workflow special handling). However, CI remediation loop is still mandatory. The `$pr_num` is extracted from the `init-existing-repository` step. After merge, the `dynamic-workflow-project-setup` branch is deleted. |
+| **Prerequisites** | All main assignments complete; PR exists with all commits pushed |
+| **Dependencies** | `debrief-and-document` must be complete; PR number from `init-existing-repository` |
+| **Risks / Challenges** | (1) CI may fail due to linting issues in plan_docs/ — the AGENTS.md specifies plan_docs/ is excluded from strict linting; (2) Branch protection may require specific reviewers — self-approval must be configured; (3) Must commit and push all local changes BEFORE merge to avoid data loss |
+| **Events** | None after this (it's the last main assignment, but post-assignment events still fire) |
+
+---
+
+### 3.7 Post-Assignment Events (After Each Main Assignment)
+
+After every main assignment completes, two events fire in sequence:
+
+#### 3.7.1 `validate-assignment-completion`
+
+| Field | Content |
+|---|---|
+| **Assignment** | `validate-assignment-completion`: Validate Assignment Completion |
+| **Goal** | Independently validate that the just-completed assignment met all acceptance criteria |
+| **Key Acceptance Criteria** | (1) All expected files exist; (2) Verification commands pass; (3) Validation report created; (4) Pass/fail status determined; (5) If failed, remediation steps provided |
+| **Project-Specific Notes** | Must be delegated to an independent `qa-test-engineer` agent — not the same agent that did the work. For Python projects, verification commands are: `uv sync`, `uv run python -c "import src"`, `uv run ruff check`, `uv run pytest`. For GitHub operations (labels, projects, issues), use `gh` CLI to verify state. |
+| **Prerequisites** | A main assignment has just completed |
+| **Dependencies** | The assignment being validated |
+| **Risks / Challenges** | Validation overhead adds time to each step; must be fast (<5 min) |
+| **Events** | None |
+
+#### 3.7.2 `report-progress`
+
+| Field | Content |
+|---|---|
+| **Assignment** | `report-progress`: Report Progress After Workflow Step Completion |
+| **Goal** | Generate structured progress reports, capture outputs, validate acceptance criteria, create checkpoints, and file action items as GitHub issues |
+| **Key Acceptance Criteria** | (1) Progress report with step name, duration, status; (2) All outputs captured; (3) Workflow state checkpointed; (4) Action items filed as GitHub issues (mandatory) |
+| **Project-Specific Notes** | Each progress report must include Deviations & Findings and Plan-Impacting Discoveries sections. All action items MUST be filed as GitHub issues — not left as text notes. |
+| **Prerequisites** | A main assignment (and its validation) has just completed |
+| **Dependencies** | `validate-assignment-completion` for the same assignment |
+| **Risks / Challenges** | Agent may skip filing issues for "minor" items — this is explicitly forbidden |
+| **Events** | None |
+
+---
+
+### 3.8 Post-script Event: Apply `orchestration:plan-approved` Label
+
+| Field | Content |
+|---|---|
+| **Event** | `post-script-complete` |
+| **Goal** | Apply the `orchestration:plan-approved` label to the application plan issue created during `create-app-plan` to signal the plan is ready for epic creation and the next orchestration phase |
+| **Key Acceptance Criteria** | Label `orchestration:plan-approved` applied to the plan issue; output recorded as `#events.post-script-complete.plan-approved` |
+| **Project-Specific Notes** | This label triggers the next phase of the orchestration pipeline. The plan issue number comes from `#initiate-new-repository.create-app-plan`. |
+| **Prerequisites** | All assignments and post-assignment events complete; setup PR merged |
+| **Dependencies** | All prior steps |
+| **Risks / Challenges** | If the plan issue was not created or its number not recorded, this step will fail |
+| **Events** | None (final event) |
 
 ---
 
 ## 4. Sequencing Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    PROJECT-SETUP DYNAMIC WORKFLOW                            │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-┌──────────────────────┐
-│  PRE-SCRIPT-BEGIN    │
-│  ─────────────────── │
-│  create-workflow-plan│ ──► Commit plan_docs/workflow-plan.md
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                           MAIN SCRIPT                                         │
-├──────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────────────────┐                                                │
-│  │ 1. init-existing-repo   │                                                │
-│  │    ─────────────────    │                                                │
-│  │ • Create branch         │                                                │
-│  │ • Create GH Project     │                                                │
-│  │ • Import labels         │                                                │
-│  │ • Create PR             │                                                │
-│  └───────────┬─────────────┘                                                │
-│              │                                                               │
-│              ▼                                                               │
-│  ┌─────────────────────────┐                                                │
-│  │ 2. create-app-plan      │                                                │
-│  │    ─────────────────    │                                                │
-│  │ • Analyze plan_docs     │                                                │
-│  │ • Create tech-stack.md  │                                                │
-│  │ • Create architecture.md│                                                │
-│  │ • Create planning issue │                                                │
-│  │ • Create milestones     │                                                │
-│  │ • Apply impl:ready label│                                                │
-│  └───────────┬─────────────┘                                                │
-│              │                                                               │
-│              ▼                                                               │
-│  ┌─────────────────────────┐                                                │
-│  │ 3. create-project-struct│                                                │
-│  │    ─────────────────    │                                                │
-│  │ • Create pyproject.toml │                                                │
-│  │ • Create src/ structure │                                                │
-│  │ • Create tests/         │                                                │
-│  │ • Create Dockerfile     │                                                │
-│  │ • Create CI/CD templates│                                                │
-│  │ • Create README.md      │                                                │
-│  │ • Create .ai-summary.md │                                                │
-│  └───────────┬─────────────┘                                                │
-│              │                                                               │
-│              ▼                                                               │
-│  ┌─────────────────────────┐                                                │
-│  │ 4. create-agents-md     │                                                │
-│  │    ─────────────────    │                                                │
-│  │ • Gather project context│                                                │
-│  │ • Validate commands     │                                                │
-│  │ • Create AGENTS.md      │                                                │
-│  │ • Cross-reference docs  │                                                │
-│  └───────────┬─────────────┘                                                │
-│              │                                                               │
-│              ▼                                                               │
-│  ┌─────────────────────────┐                                                │
-│  │ 5. debrief-and-document │                                                │
-│  │    ─────────────────    │                                                │
-│  │ • Create 12-section rpt │                                                │
-│  │ • Document deviations   │                                                │
-│  │ • Save execution trace  │                                                │
-│  │ • Commit to repo        │                                                │
-│  └───────────┬─────────────┘                                                │
-│              │                                                               │
-└──────────────┼──────────────────────────────────────────────────────────────┘
-               │
-               ▼
-┌──────────────────────────────┐
-│  POST-ASSIGNMENT-COMPLETE    │
-│  ──────────────────────────  │
-│                              │
-│  ┌─────────────────────────┐ │
-│  │ validate-assignment-    │ │
-│  │ completion              │ │
-│  └───────────┬─────────────┘ │
-│              │               │
-│              ▼               │
-│  ┌─────────────────────────┐ │
-│  │ report-progress         │ │
-│  └─────────────────────────┘ │
-│                              │
-└──────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                   PRE-SCRIPT EVENT                                  │
+│                                                                     │
+│  ┌──────────────────────┐                                           │
+│  │ create-workflow-plan  │  ← YOU ARE HERE                          │
+│  └──────────┬───────────┘                                           │
+└─────────────┼───────────────────────────────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   MAIN ASSIGNMENTS                                   │
+│                                                                     │
+│  ┌───────────────────────────┐                                       │
+│  │ 1. init-existing-repository│                                      │
+│  └──────────┬────────────────┘                                       │
+│             │  ┌──────────────────────────┐  ┌─────────────────┐    │
+│             └─▶│ validate-assignment-      │─▶│ report-progress │    │
+│                │ completion               │  └────────┬────────┘    │
+│                └──────────────────────────┘           │             │
+│                                                       ▼             │
+│  ┌───────────────────────────┐                                       │
+│  │ 2. create-app-plan        │                                       │
+│  └──────────┬────────────────┘                                       │
+│             │  ┌──────────────────────────┐  ┌─────────────────┐    │
+│             └─▶│ validate-assignment-      │─▶│ report-progress │    │
+│                │ completion               │  └────────┬────────┘    │
+│                └──────────────────────────┘           │             │
+│                                                       ▼             │
+│  ┌───────────────────────────┐                                       │
+│  │ 3. create-project-structure│                                      │
+│  └──────────┬────────────────┘                                       │
+│             │  ┌──────────────────────────┐  ┌─────────────────┐    │
+│             └─▶│ validate-assignment-      │─▶│ report-progress │    │
+│                │ completion               │  └────────┬────────┘    │
+│                └──────────────────────────┘           │             │
+│                                                       ▼             │
+│  ┌───────────────────────────┐                                       │
+│  │ 4. create-agents-md-file  │                                       │
+│  └──────────┬────────────────┘                                       │
+│             │  ┌──────────────────────────┐  ┌─────────────────┐    │
+│             └─▶│ validate-assignment-      │─▶│ report-progress │    │
+│                │ completion               │  └────────┬────────┘    │
+│                └──────────────────────────┘           │             │
+│                                                       ▼             │
+│  ┌───────────────────────────┐                                       │
+│  │ 5. debrief-and-document   │                                       │
+│  └──────────┬────────────────┘                                       │
+│             │  ┌──────────────────────────┐  ┌─────────────────┐    │
+│             └─▶│ validate-assignment-      │─▶│ report-progress │    │
+│                │ completion               │  └────────┬────────┘    │
+│                └──────────────────────────┘           │             │
+│                                                       ▼             │
+│  ┌───────────────────────────┐                                       │
+│  │ 6. pr-approval-and-merge  │  (self-approval, CI loop, delete     │
+│  └──────────┬────────────────┘   setup branch on merge)             │
+│             │  ┌──────────────────────────┐  ┌─────────────────┐    │
+│             └─▶│ validate-assignment-      │─▶│ report-progress │    │
+│                │ completion               │  └────────┬────────┘    │
+│                └──────────────────────────┘           │             │
+└───────────────────────────────────────────────────────┼─────────────┘
+                                                        │
+                                                        ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   POST-SCRIPT EVENT                                  │
+│                                                                     │
+│  ┌──────────────────────────────────────┐                           │
+│  │ Apply `orchestration:plan-approved`   │                           │
+│  │ label to plan issue                  │                           │
+│  └──────────────────────────────────────┘                           │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## 5. Open Questions
 
-### Resolved Questions
+### 5.1 PAT Scope for Branch Protection
 
-| Question | Resolution |
-|----------|------------|
-| Tech stack for project structure? | Python 3.12+ with uv package manager (per Implementation Spec) |
-| Should Phase 3 features be in MVP spec? | Moved to Future Work appendix (S-9) |
-| Connection pooling strategy? | Single httpx.AsyncClient in GitHubQueue.__init__() (I-4/R-5) |
+**Question:** Does the `GH_ORCHESTRATION_AGENT_TOKEN` (or equivalent PAT) have the `administration: write` scope required to import the branch protection ruleset? If not, the `init-existing-repository` assignment will fail at step 2.
 
-### Questions for Stakeholder Review
+**Impact:** Blocks branch protection import; must be resolved before starting `init-existing-repository`.
 
-| # | Question | Context | Recommendation |
-|---|----------|---------|----------------|
-| 1 | Package name for `src/`? | Need to decide on Python package name | Use `os_apow` or `workflow_orchestration_queue` |
-| 2 | Should existing plan_docs code be moved to src/? | Reference implementations exist in plan_docs/ | Move during create-project-structure, preserving plan_docs as docs |
-| 3 | CI/CD platform? | GitHub Actions workflows to create | Use existing .github/workflows/ patterns from template |
+### 5.2 Application Plan Issue Template Location
 
----
+**Question:** The `create-app-plan` assignment references an issue template at `.github/ISSUE_TEMPLATE/application-plan.md`. Does this template exist in the repository? The assignment also references an "Appendix A" template. Which should be used?
 
-## 6. Risk Assessment
+**Impact:** Affects how the plan issue is formatted.
 
-| Risk | Impact | Likelihood | Mitigation |
-|------|--------|------------|------------|
-| GitHub API rate limiting during label/project setup | Medium | Low | Use GitHub App installation tokens (5,000 req/hr) |
-| Missing environment variables | High | Medium | Validate at startup, crash with clear error message |
-| Branch already exists | Low | Low | Check first, delete or use existing |
-| Planning issue template mismatch | Medium | Low | Use .github/ISSUE_TEMPLATE/application-plan.md |
+### 5.3 Existing Content in Repository Root
 
----
+**Question:** The repository root already contains template files (AGENTS.md, .devcontainer/, .github/, .opencode/, scripts/, test/, local_ai_instruction_modules/). The `create-project-structure` assignment will add new application-specific files. Should the template infrastructure files be preserved as-is, or should they be restructured to accommodate the new project structure?
 
-## 7. Success Criteria
+**Impact:** Affects the scope of `create-project-structure`.
 
-The workflow is considered successful when:
+### 5.4 Reference Implementation Usage
 
-1. ✅ Branch `dynamic-workflow-project-setup` exists with all commits
-2. ✅ GitHub Project created and linked to repository
-3. ✅ Labels imported from `.github/.labels.json`
-4. ✅ Application plan issue created with `implementation:ready` label
-5. ✅ Project structure created (pyproject.toml, src/, tests/, Dockerfile)
-6. ✅ AGENTS.md exists at repository root with validated commands
-7. ✅ Debrief report committed with all 12 sections
-8. ✅ PR open from `dynamic-workflow-project-setup` to `main`
+**Question:** The reference implementations in `plan_docs/` (orchestrator_sentinel.py, notifier_service.py, etc.) are described as "scaffolds" and "reference code." Should the `create-project-structure` assignment use these as the actual source files (moving them into `src/`), or should they serve only as reference material while new code is written?
+
+**Impact:** Affects code quality and development velocity in `create-project-structure`.
+
+### 5.5 Milestone Naming Convention
+
+**Question:** The plan has 4 phases (0-3). Should milestones be named "Phase 0: Seeding", "Phase 1: Foundation", "Phase 2: Webhook Automation", "Phase 3: Deep Orchestration"? Or should they follow a different convention?
+
+**Impact:** Affects `create-app-plan` milestone creation.
+
+### 5.6 Cost Guardrails (Story 6) Scope
+
+**Question:** Cost guardrails are marked as "deferred" in the plan docs, but `WorkItemStatus.STALLED_BUDGET` and the `agent:stalled-budget` label are defined in the model. Should the project structure include placeholder/stub code for cost guardrails, or omit it entirely?
+
+**Impact:** Minor — affects completeness of `create-project-structure`.
 
 ---
 
-## 8. Approval
+## 6. Risk Register
 
-**This workflow execution plan has been reviewed and approved.**
-
-### Approval Checklist
-
-- [x] All assignments understood and sequenced correctly
-- [x] Project context accurately captured
-- [x] Dependencies identified
-- [x] Risks acknowledged
-- [x] Open questions noted for resolution
-
-### Stakeholder Approval
-
-**Approved by:** Orchestrator Agent  
-**Date:** 2026-04-06  
-**Comments:** Plan approved - comprehensive coverage of all assignments with proper sequencing, dependencies, and risk identification
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| PAT lacks `administration: write` scope | Medium | High — blocks branch protection | Pre-verify with `scripts/test-github-permissions.ps1`; fail loudly if missing |
+| CI fails on plan_docs/ linting | Medium | Medium — blocks PR merge | plan_docs/ should be excluded from linting per AGENTS.md |
+| Reference code has hidden bugs | Low | Medium — propagates issues | Plan Review already identified and most issues are resolved in the reference code |
+| Agent writes code during `create-app-plan` | Low | Medium — violates assignment constraints | Reinforce "planning only" constraint; validation will catch this |
+| Branch deletion loses uncommitted work | Low | High — data loss | Ensure all changes are committed and pushed before merge in `pr-approval-and-merge` |
+| GitHub API rate limiting during setup | Low | Low — retryable | Assignments use `gh` CLI which handles auth; no polling loop in setup |
 
 ---
 
-*Plan Created:* 2026-04-06  
-*Workflow:* project-setup  
-*Repository:* intel-agency/workflow-orchestration-queue-kilo15-a
+*This plan was auto-generated by the `create-workflow-plan` pre-script event of the `project-setup` dynamic workflow.*
+*All assignment definitions were resolved from the canonical remote repository: `nam20485/agent-instructions`.*
