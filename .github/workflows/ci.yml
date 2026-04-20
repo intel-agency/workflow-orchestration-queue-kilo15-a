@@ -1,0 +1,190 @@
+# CI Workflow for workflow-orchestration-queue
+# All actions are pinned to specific commit SHAs for security
+
+name: CI
+
+on:
+  push:
+    branches: [main, dynamic-workflow-project-setup]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.12"
+  UV_VERSION: "0.5.0"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Lint: Code quality checks
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98  # v6.0.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c15d185f03657a1644ed2684496fb7c6ed59815  # v8.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@28f2168f4d98ee0445e3c6321f6e6616c83dd5ec  # v6.2.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run Ruff (linter)
+        run: uv run ruff check src/ tests/
+
+      - name: Run Ruff (formatter check)
+        run: uv run ruff format --check src/ tests/
+
+  # ---------------------------------------------------------------------------
+  # Type Check: Static type analysis
+  # ---------------------------------------------------------------------------
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98  # v6.0.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c15d185f03657a1644ed2684496fb7c6ed59815  # v8.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@28f2168f4d98ee0445e3c6321f6e6616c83dd5ec  # v6.2.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run MyPy
+        run: uv run python -m mypy src/
+
+  # ---------------------------------------------------------------------------
+  # Test: Run test suite with coverage
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98  # v6.0.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c15d185f03657a1644ed2684496fb7c6ed59815  # v8.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@28f2168f4d98ee0445e3c6321f6e6616c83dd5ec  # v6.2.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run tests with coverage
+        run: uv run pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2  # v5.5.0
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # Build: Build Docker image
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98  # v6.0.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@21162887f0d6e25b4e8eafb0cf44cf9bf7f6acd3  # v3.11.1
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v3.5.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@c3b064c6d7c32446d6bc214ea075f1caad2de35a  # v5.7.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@83bfd93ab480705a7b99a2ed02765137f5ab55ba  # v6.15.0
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Security Scan: Check for vulnerabilities
+  # ---------------------------------------------------------------------------
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98  # v6.0.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c15d185f03657a1644ed2684496fb7c6ed59815  # v8.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@28f2168f4d98ee0445e3c6321f6e6616c83dd5ec  # v6.2.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit --skip-editable
+        continue-on-error: true
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.31.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+        continue-on-error: true
